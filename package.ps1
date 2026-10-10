@@ -9,7 +9,7 @@ foreach($taskZipName in @(('office-buddy-v'+$taskVersion+'-source.zip'),('Office
 }
 $taskFiles=@('OfficeBuddy.cs','SpriteMotion.cs','PixelEye.cs','PixelDecor.cs','application.manifest',
     'build.ps1','verify.ps1','check-motion.py','package.ps1','.gitignore','.gitattributes','LICENSE',
-    'README.md','RUNNING.md','ASSETS.md','DESIGN.md','CONTRIBUTING.md','CHANGELOG.md','PUBLISH.md',
+    'README.md','RUNNING.md','ASSETS.md','DESIGN.md','CONTRIBUTING.md','CHANGELOG.md',
     '像素搭子.cmd','奶油搭子.cmd','夜猫搭子.cmd','统一眼睛与手.gif',
     'v080-catalog.png','v080-quiet.png','v080-compact.png','v080-overview.png','v080-shop.png','v080-style.png',
     '.github\workflows\build.yml',

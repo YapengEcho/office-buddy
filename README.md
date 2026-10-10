@@ -64,7 +64,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\verify.ps1
 | `DESIGN.md` | 设计资料与改版依据 |
 | `ASSETS.md` | 素材来源及生成提示词 |
 | `package.ps1` | 清单导出源码和便携运行包 |
-| `PUBLISH.md` / `CONTRIBUTING.md` | GitHub 发布和参与说明 |
+| `CONTRIBUTING.md` | 参与改进说明 |
 
 预览使用演示数据，不读取真实存档。窗口拖动位置暂不跨启动保存。未逐一验证混合 DPI 多屏、全屏独占游戏、远程桌面及特殊输入设备。程序目前未做代码签名。
 
@@ -87,4 +87,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\package.ps1
 
 导出到 `work/packages`：一个可直接初始化 Git 的源码目录、源码 ZIP 和 Windows 运行 ZIP。清单包含当前文档和素材，排除 EXE（源码包）、旧预览、临时数据与个人存档。相同版本的 ZIP 已存在时会停止，可指定新的 `-OutputDirectory`。GitHub Actions 会构建、执行功能检查并导出 ZIP；桌面窗口与图像检查在本地 Windows 会话运行。
 
-项目采用 [MIT 许可证](LICENSE)，素材来源见 [ASSETS.md](ASSETS.md)，版本记录见 [CHANGELOG.md](CHANGELOG.md)。首次发布步骤见 [PUBLISH.md](PUBLISH.md)。
+项目采用 [MIT 许可证](LICENSE)，素材来源见 [ASSETS.md](ASSETS.md)，版本记录见 [CHANGELOG.md](CHANGELOG.md)。
