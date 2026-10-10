@@ -1,17 +1,17 @@
 ﻿param([string]$OutputDirectory = (Join-Path $PSScriptRoot 'work\packages'))
 $ErrorActionPreference='Stop'
-$taskVersion='0.8.0'
+$taskVersion='0.9.0'
 $taskOutput=[IO.Path]::GetFullPath($OutputDirectory)
 $taskSource=Join-Path $taskOutput ('office-buddy-github-v'+$taskVersion)
 $taskPortable=Join-Path $taskOutput ('OfficeBuddyStudio-v'+$taskVersion+'-windows-x64')
 foreach($taskZipName in @(('office-buddy-v'+$taskVersion+'-source.zip'),('OfficeBuddyStudio-v'+$taskVersion+'-windows-x64.zip'))) {
     if(Test-Path -LiteralPath (Join-Path $taskOutput $taskZipName)){throw '同版本 ZIP 已存在，请使用新的 -OutputDirectory。'}
 }
-$taskFiles=@('OfficeBuddy.cs','SpriteMotion.cs','PixelEye.cs','PixelDecor.cs','application.manifest',
+$taskFiles=@('OfficeBuddy.cs','SpriteMotion.cs','PixelEye.cs','PixelDecor.cs','WorkFeatures.cs','BuddyFeatures.cs','SettingsForm.cs','FeatureChecks.cs','application.manifest',
     'build.ps1','verify.ps1','check-motion.py','package.ps1','.gitignore','.gitattributes','LICENSE',
     'README.md','RUNNING.md','ASSETS.md','DESIGN.md','CONTRIBUTING.md','CHANGELOG.md',
-    '像素搭子.cmd','奶油搭子.cmd','夜猫搭子.cmd','统一眼睛与手.gif',
-    'v080-catalog.png','v080-quiet.png','v080-compact.png','v080-overview.png','v080-shop.png','v080-style.png',
+    '像素搭子.cmd','奶油搭子.cmd','夜猫搭子.cmd','统一眼睛与手.gif','睡眠与互动.gif',
+    'v090-catalog.png','v090-quiet.png','v090-compact.png','v090-overview.png','v090-shop.png','v090-style.png','v090-month.png','v090-settings.png','v090-settings-daily.png','v090-settings-work.png','v090-settings-data.png',
     '.github\workflows\build.yml',
     'assets\mint-cat.png','assets\mint-cat-rig.png','assets\mint-cat-water.png',
     'assets\apricot-rabbit.png','assets\apricot-rabbit-rig.png','assets\moon-cat.png','assets\moon-cat-rig.png')

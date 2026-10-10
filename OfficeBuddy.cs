@@ -27,6 +27,10 @@ namespace OfficeBuddy {
         [DataMember] public string Theme = "pixel";
         [DataMember] public int Zoom = 100;
         [DataMember] public int PetScale = 55;
+        [DataMember] public UserSettings Settings = new UserSettings();
+        [DataMember] public bool HasPosition;
+        [DataMember] public int PetX,PetY;
+        [DataMember] public string LastOffworkDay="";
     }
     public class Item {
         public string Id, Name, Description; public int Cost;
@@ -48,8 +52,8 @@ namespace OfficeBuddy {
             if(day==null) { day=new Day { Date=key }; Data.Days.Add(day); }
             return day;
         }
-        public int Click(int button, DateTime now) {
-            if(Paused || button<0 || button>4) return 0;
+        public int Click(int button, DateTime now,bool own=false) {
+            if(Paused || button<0 || button>4 || (own&&Data.Settings!=null&&!Data.Settings.CountOwnClicks)) return 0;
             Day d=Today(now); d.Buttons[button]++; Data.Lifetime[button]++;
             int target=(int)Math.Min(20L,d.Total/100);
             int gained=Math.Max(0,target-d.Earned); d.Earned+=gained; Data.Coins+=gained;
@@ -80,7 +84,7 @@ namespace OfficeBuddy {
                 var data=(SaveData)new DataContractJsonSerializer(typeof(SaveData)).ReadObject(s);
                 if(data==null || data.Version!=1 || data.Lifetime==null || data.Lifetime.Length!=5 ||
                    data.Lifetime.Any(x=>x<0) || data.Days==null || data.Owned==null || data.Coins<0 ||
-                   data.Days.Any(d=>d==null || d.Date==null || d.Buttons==null || d.Buttons.Length!=5 ||
+                   data.Days.Any(d=>d==null || !ValidDate(d.Date) || d.Buttons==null || d.Buttons.Length!=5 ||
                        d.Buttons.Any(x=>x<0) || d.Earned<0 || d.Earned>20) ||
                    data.Days.Select(d=>d.Date).Distinct().Count()!=data.Days.Count)
                     throw new InvalidDataException("存档结构不完整。");
@@ -88,9 +92,11 @@ namespace OfficeBuddy {
                 if(data.Zoom!=120&&data.Zoom!=140)data.Zoom=100;
                 if(data.PetScale!=40&&data.PetScale!=70)data.PetScale=55;
                 data.Equipped=(data.Equipped??data.Owned).Intersect(data.Owned).Distinct().ToList();
+                data.Settings=data.Settings??new UserSettings();data.Settings.Normalize();
                 return data;
             }
         }
+        static bool ValidDate(string value){DateTime date;return DateTime.TryParseExact(value,"yyyy-MM-dd",System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.None,out date);}
         public SaveData Load() {
             if(!File.Exists(Path)) return new SaveData();
             try { return Read(Path); }
@@ -156,7 +162,7 @@ namespace OfficeBuddy {
         public static void EnableDpi() {try{if(SetProcessDpiAwarenessContext(new IntPtr(-4)))return;}catch(EntryPointNotFoundException){}SetProcessDPIAware();}
         public static float Dpi(IntPtr hwnd) {try {return Math.Max(96,GetDpiForWindow(hwnd))/96f;}catch(EntryPointNotFoundException){return 1;}}
     }
-    public class BuddyForm : Form {
+    public partial class BuddyForm : Form {
         readonly Model model; readonly Store store; readonly bool renderOnly;
         readonly System.Windows.Forms.Timer timer=new System.Windows.Forms.Timer();
         readonly List<Tuple<RectangleF,Action>> hits=new List<Tuple<RectangleF,Action>>();
@@ -181,7 +187,7 @@ namespace OfficeBuddy {
         Color Accent {get{return Skin=="pixel"?C("#4D7160"):Skin=="cream"?C("#995B40"):C("#8ED7BC");}}
         static Color C(string hex){return ColorTranslator.FromHtml(hex);}
         public BuddyForm(Model m,Store s,bool preview) {
-            model=m; store=s; renderOnly=preview;ApplyPalette();if(model.Data.Zoom!=120&&model.Data.Zoom!=140)model.Data.Zoom=100;
+            model=m; store=s; renderOnly=preview;InitializeFeatures();ApplyPalette();if(model.Data.Zoom!=120&&model.Data.Zoom!=140)model.Data.Zoom=100;
             Text="上班搭子 · 桌面宠物";
             AutoScaleMode=AutoScaleMode.None; FormBorderStyle=FormBorderStyle.None; MaximizeBox=false;
             ClientSize=new Size(320,360);TopMost=true;ShowInTaskbar=false;
@@ -189,15 +195,15 @@ namespace OfficeBuddy {
             Location=new Point(area.Right-ClientSize.Width-30,area.Bottom-ClientSize.Height-16); BackColor=cream;
             SetStyle(ControlStyles.AllPaintingInWmPaint|ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer,true);
             Icon=MakeIcon();
-            MouseMove+=(o,e)=>{if(dragging){Point p=Cursor.Position;Location=new Point(windowOrigin.X+p.X-dragOrigin.X,windowOrigin.Y+p.Y-dragOrigin.Y);}bool changed=compact?UpdatePointerHover():false;if(!compact)hover=new PointF(e.X/scale,e.Y/scale);Cursor=hits.Any(h=>h.Item1.Contains(hover))?Cursors.Hand:compact?Cursors.SizeAll:Cursors.Default;if(changed)RenderLayer();};
+            MouseMove+=(o,e)=>{if(dragging){Point p=Cursor.Position;justDragged|=Math.Abs(p.X-dragOrigin.X)+Math.Abs(p.Y-dragOrigin.Y)>4;Location=PetPlacement.Constrain(new Point(windowOrigin.X+p.X-dragOrigin.X,windowOrigin.Y+p.Y-dragOrigin.Y),ClientSize,WorkingAreas);}bool changed=compact?UpdatePointerHover():false;if(!compact)hover=new PointF(e.X/scale,e.Y/scale);Cursor=hits.Any(h=>h.Item1.Contains(hover))?Cursors.Hand:compact&&!Preferences.PositionLocked?Cursors.SizeAll:Cursors.Default;if(changed)RenderLayer();};
             MouseLeave+=(o,e)=>{if(compact){if(UpdatePointerHover())RenderLayer();}else hover=new PointF(-1,-1);};
-            MouseClick+=(o,e)=>{if(e.Button==MouseButtons.Left) { var h=hits.LastOrDefault(x=>x.Item1.Contains(new PointF(e.X/scale,e.Y/scale))); if(h!=null) h.Item2(); }};
-            MouseDown+=(o,e)=>{if(compact && e.Button==MouseButtons.Left && e.Y/scale>100 && e.Y/scale<358 && !hits.Any(h=>h.Item1.Contains(new PointF(e.X/scale,e.Y/scale)))) {dragging=true;dragOrigin=Cursor.Position;windowOrigin=Location;Capture=true;}};
-            MouseUp+=(o,e)=>{dragging=false;Capture=false;};
+            MouseClick+=(o,e)=>{if(e.Button==MouseButtons.Left) { var h=hits.LastOrDefault(x=>x.Item1.Contains(new PointF(e.X/scale,e.Y/scale))); if(h!=null) h.Item2();else if(compact&&!justDragged){companion.Happy(DateTime.UtcNow);Say("摸摸头，好啦，一起忙。",3);RenderLayer();} }};
+            MouseDown+=(o,e)=>{justDragged=false;if(compact && !Preferences.PositionLocked && e.Button==MouseButtons.Left && e.Y/scale>100 && e.Y/scale<358 && !hits.Any(h=>h.Item1.Contains(new PointF(e.X/scale,e.Y/scale)))) {dragging=true;dragOrigin=Cursor.Position;windowOrigin=Location;Capture=true;}};
+            MouseUp+=(o,e)=>{if(dragging&&justDragged){SavePetPosition();Persist();}dragging=false;Capture=false;};
             MouseClick+=(o,e)=>{if(e.Button==MouseButtons.Right && trayMenu!=null) trayMenu.Show(this,e.Location);};
             Shown+=(o,e)=>{if(compact&&!renderOnly)RenderLayer();};
             Resize+=(o,e)=>{if(WindowState==FormWindowState.Minimized && !renderOnly) { Hide(); if(tray!=null) tray.ShowBalloonTip(1800,"搭子还在陪你","后台继续统计。双击托盘图标回来。",ToolTipIcon.Info); }};
-            FormClosing+=(o,e)=>{ if(!renderOnly) { if(!compact&&!exitRequested&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;ToggleCompact();return;} if(!Persist()) { if(MessageBox.Show("记录保存失败："+saveError+"\n仍要退出吗？", "保存失败",MessageBoxButtons.YesNo,MessageBoxIcon.Warning)==DialogResult.No) { e.Cancel=true; return; } } timer.Stop(); if(tray!=null) tray.Dispose(); } };
+            FormClosing+=(o,e)=>{ if(!renderOnly) { if(!compact&&!exitRequested&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;ToggleCompact();return;} SavePetPosition();if(!Persist()) { if(MessageBox.Show("记录保存失败："+saveError+"\n仍要退出吗？", "保存失败",MessageBoxButtons.YesNo,MessageBoxIcon.Warning)==DialogResult.No) { e.Cancel=true; return; } } timer.Stop(); if(tray!=null) tray.Dispose(); } };
             if(!preview) { CreateTray(); timer.Interval=40; timer.Tick+=(o,e)=>Tick(); timer.Start(); }
         }
         protected override CreateParams CreateParams {get {var p=base.CreateParams;if(compact)p.ExStyle|=0x80000|0x80|0x08000000;return p;}}
@@ -240,6 +246,10 @@ namespace OfficeBuddy {
                 trayMenu.Items.Add(compact?"一起开工":"回到桌面搭子",null,(a,b)=>{SetThrough(false); if(!compact)ToggleCompact();Mode("work");ShowBuddy();});
                 trayMenu.Items.Add("喝口水",null,(a,b)=>Mode("water"));
                 trayMenu.Items.Add("午休一下",null,(a,b)=>Mode("rest"));
+                trayMenu.Items.Add("设置…",null,(a,b)=>OpenSettings(0));
+                trayMenu.Items.Add("月度统计 / 导出",null,(a,b)=>{SetThrough(false);if(compact)ToggleCompact();activeTab="month";ShowBuddy();Invalidate();});
+                var locked=new ToolStripMenuItem("锁定位置"){Checked=Preferences.PositionLocked};locked.Click+=(a,b)=>{Preferences.PositionLocked=!Preferences.PositionLocked;dirty=true;Persist();};trayMenu.Items.Add(locked);
+                var dnd=new ToolStripMenuItem("勿扰 · 不弹出提醒"){Checked=Preferences.DoNotDisturb};dnd.Click+=(a,b)=>ToggleDnd();trayMenu.Items.Add(dnd);
                 var skins=new ToolStripMenuItem("外观 · "+SkinName);
                 foreach(string name in new[]{"pixel","cream","midnight"}) {string choice=name;var item=new ToolStripMenuItem(name=="pixel"?"像素风 · 薄荷":name=="cream"?"像素风 · 糯米兔":"像素风 · 月光");item.Checked=Skin==name;item.Click+=(a,b)=>ChooseTheme(choice);skins.DropDownItems.Add(item);}trayMenu.Items.Add(skins);
                 var petSize=new ToolStripMenuItem("角色大小");foreach(int value in new[]{40,55,70}){int choice=value;var item=new ToolStripMenuItem(value==40?"迷你":value==55?"小号 · 默认":"中号");item.Checked=model.Data.PetScale==value;item.Click+=(a,b)=>ChoosePetSize(choice);petSize.DropDownItems.Add(item);}trayMenu.Items.Add(petSize);
@@ -256,9 +266,11 @@ namespace OfficeBuddy {
         void ShowBuddy() { Show(); WindowState=FormWindowState.Normal; if(compact)RenderLayer();else Activate(); }
         protected override void OnHandleCreated(EventArgs e) {
             base.OnHandleCreated(e);
-            if(!renderOnly) { ResizeDpi(Native.Dpi(Handle));if(compact&&!located){Rectangle area=Screen.FromControl(this).WorkingArea;Location=new Point(area.Right-Width-30,area.Bottom-Height-16);located=true;}var d=new Native.Device {Page=1,Usage=2,Flags=0x100,Target=Handle}; rawOk=Native.RegisterRawInputDevices(new[]{d},1,(uint)Marshal.SizeOf(typeof(Native.Device))); if(!rawOk) Say("鼠标监听未启动，请重启搭子。",30); }
+            if(!renderOnly) { ResizeDpi(Native.Dpi(Handle));if(compact&&!located){RestorePetPosition();located=true;}RegisterShortcut();var d=new Native.Device {Page=1,Usage=2,Flags=0x100,Target=Handle}; rawOk=Native.RegisterRawInputDevices(new[]{d},1,(uint)Marshal.SizeOf(typeof(Native.Device))); if(!rawOk) Say("鼠标监听未启动，请重启搭子。",30); }
         }
         protected override void WndProc(ref Message msg) {
+            if(msg.Msg==0x312&&!renderOnly&&msg.WParam.ToInt32()==0x4F42){ToggleVisibility();return;}
+            if(msg.Msg==0x7E&&!renderOnly&&compact){Location=PetPlacement.Constrain(Location,ClientSize,WorkingAreas);SavePetPosition();RenderLayer();}
             if((uint)msg.Msg==Native.ThemeMessage&&!renderOnly){int choice=msg.WParam.ToInt32();ChooseTheme(choice==1?"cream":choice==2?"midnight":"pixel");ShowBuddy();return;}
             if(msg.Msg==0x2E0&&!renderOnly){ResizeDpi((msg.WParam.ToInt64()&0xFFFF)/96f);Rectangle area=Screen.FromControl(this).WorkingArea;Location=new Point(Math.Max(area.Left,Math.Min(Left,area.Right-Width)),Math.Max(area.Top,Math.Min(Top,area.Bottom-Height)));if(compact)RenderLayer();return;}
             if(msg.Msg==0xFF && !renderOnly) {
@@ -277,7 +289,8 @@ namespace OfficeBuddy {
             base.WndProc(ref msg);
         }
         void Receive(int button) {
-            int gain=model.Click(button,DateTime.Now); if(model.Paused) return;
+            bool own=!Preferences.CountOwnClicks&&IsOwnClick();if(model.Paused||own)return;
+            int gain=model.Click(button,DateTime.Now,own);
             dirty=true;lastInput=DateTime.UtcNow;lastButton=button;anim=1;
             if(button==0||button==2||button==3)leftTap=1;
             if(button==1||button==2||button==4)rightTap=1;
@@ -285,6 +298,7 @@ namespace OfficeBuddy {
             if(gain>0) Say("叮，攒到一枚搭子币！",4);
         }
         void Tick() {
+            FeatureTick();
             anim=Math.Max(0,anim-0.08);leftTap=Math.Max(0,leftTap-0.085);rightTap=Math.Max(0,rightTap-0.085);
             string key=DateTime.Now.ToString("yyyy-MM-dd");
             if(dayKey!=key) {dayKey=key;model.Today(DateTime.Now);dirty=true;}
@@ -297,10 +311,11 @@ namespace OfficeBuddy {
         void Pause() {model.Paused=!model.Paused; Say(model.Paused?"暂停记数，我陪着。":"好啦，继续一起忙。",6);}
         void Mode(string next) {mode=next;Say(next=="water"?"喝口水，再慢慢忙。":next=="rest"?"正在充电，稍后开工。":"开工，今天也慢慢来。",10);}
         void ToggleCompact() {
+            if(compact){SavePetPosition();Persist();}
             SetThrough(false);compact=!compact;Hide();TopMost=compact;
             FormBorderStyle=compact?FormBorderStyle.None:FormBorderStyle.FixedSingle;
             ShowInTaskbar=!compact;RecreateHandle();ResizeDpi(Native.Dpi(Handle));
-            if(compact) {Rectangle area=Screen.FromControl(this).WorkingArea; Location=new Point(area.Right-Width-30,area.Bottom-Height-16);} else CenterToScreen();
+            if(compact) RestorePetPosition();else CenterToScreen();
             hover=new PointF(-1,-1);panelHovered=false;ShowBuddy();Invalidate();
         }
         void SetThrough(bool enabled) { through=enabled && compact;
@@ -312,8 +327,9 @@ namespace OfficeBuddy {
             if(model.Data.Owned.Contains(item.Id)) {Say(""+item.Name+"已经在工位上啦。",5);return;}
             if(!model.Buy(item)) {Say("还差 "+Math.Max(0,item.Cost-model.Data.Coins)+" 枚搭子币，慢慢攒就好。",6);return;}
             dirty=true;Persist();Say("收到了！我的"+item.Name+"，谢谢你。",8);
+            companion.Happy(DateTime.UtcNow);
         }
-        void About() {MessageBox.Show("上班搭子 · 薄荷像素 v0.8.0\n\n右键菜单可切换外观；角色大小与文字大小独立调整。\n默认透明背景，无边框，不抢当前窗口焦点。\n拖动搭子移动位置；靠近时显示计数和互动按钮。\n右键搭子或托盘可打开菜单，查看统计及布置工位。\n\n左右中键、两个侧键：按下一次计一次。\n双击计两次，滚动和松开不计数。软件自身的点击也计数。\n每 100 次点击获得 1 枚搭子币，每日最多 20 枚。\n暂停时停止计数；喝水与午休只切换动作。\n隐藏或最小化后继续统计；关闭工位窗口会回到桌宠。\n要结束程序，请右键菜单选择“退出”。\n\n仅记录每日各按键次数、累计次数和装饰。\n不记录坐标、窗口标题或键盘，不联网，不自动开机启动。\n每日按电脑本地日期结算，每 5 秒保存一次。\n\n存档："+store.Path+"\n\n背景透明部分可直接操作下方窗口。托盘还可开启整个搭子的鼠标穿透。\n全屏独占游戏、远程桌面及特殊输入设备尚未逐一验证。"+(layerError!=""?"\n\n"+layerError:""), "关于上班搭子",MessageBoxButtons.OK,MessageBoxIcon.Information);}
+        void About() {MessageBox.Show("上班搭子 · 薄荷像素 v0.9.0\n\n右键菜单可切换外观；角色大小与文字大小独立调整。\n默认透明背景，无边框，不抢当前窗口焦点。\n拖动搭子移动位置；靠近时显示计数和互动按钮。\n右键搭子或托盘可打开菜单，查看统计及布置工位。\n\n左右中键、两个侧键：按下一次计一次。\n双击计两次，滚动和松开不计数。软件自身的点击也计数。\n每 100 次点击获得 1 枚搭子币，每日最多 20 枚。\n暂停时停止计数；喝水与午休只切换动作。\n隐藏或最小化后继续统计；关闭工位窗口会回到桌宠。\n要结束程序，请右键菜单选择“退出”。\n\n仅记录每日各按键次数、累计次数和装饰。\n不记录坐标、窗口标题或键盘，不联网；开机启动可在设置中选择。\n每日按电脑本地日期结算，每 5 秒保存一次。\n\n存档："+store.Path+"\n\n背景透明部分可直接操作下方窗口。托盘还可开启整个搭子的鼠标穿透。\n全屏独占游戏、远程桌面及特殊输入设备尚未逐一验证。"+(layerError!=""?"\n\n"+layerError:""), "关于上班搭子",MessageBoxButtons.OK,MessageBoxIcon.Information);}
         protected override void OnPaint(PaintEventArgs e) {
             base.OnPaint(e); Graphics g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;g.TextRenderingHint=System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             hits.Clear();scale=ClientSize.Width/(compact?320f:720f);g.ScaleTransform(scale,scale);g.Clear(compact?Color.Transparent:cream);
@@ -333,6 +349,10 @@ namespace OfficeBuddy {
         string Speech() {
             if(DateTime.UtcNow<bubbleUntil) return bubble;
             if(model.Paused) return "先歇一下，我在这里。";
+            if(companion.Mood==CompanionMood.Sleeping)return "搭子睡着了，回来时一起开工。";
+            if(companion.Mood==CompanionMood.Yawning)return "打个哈欠，眯一小会儿。";
+            if(companion.Mood==CompanionMood.Waking)return "你回来啦，一起继续。";
+            if(companion.Mood==CompanionMood.Happy)return "收到你的摸摸，元气补上啦。";
             if(mode=="water") return "喝口水，再慢慢忙。";
             if(mode=="rest") return "正在充电，稍后开工。";
             if((DateTime.UtcNow-lastInput).TotalSeconds>180) return "你忙你的，我陪着。";
@@ -343,14 +363,15 @@ namespace OfficeBuddy {
         }
         void DrawFull(Graphics g) {
             Txt(g,"上班搭子",24,20,24,ink,true);Txt(g,"把普通的工作日，过得可爱一点。",25,52,13,muted,false);
-            Button(g,"概览",332,28,70,34,()=>{activeTab="overview";Invalidate();},activeTab=="overview");
-            Button(g,"工位",410,28,70,34,()=>{activeTab="shop";Invalidate();},activeTab=="shop");
-            Button(g,"外观",488,28,70,34,()=>{activeTab="style";Invalidate();},activeTab=="style");
+            Button(g,"概览",258,28,70,34,()=>{activeTab="overview";Invalidate();},activeTab=="overview"||activeTab=="month");
+            Button(g,"工位",336,28,70,34,()=>{activeTab="shop";Invalidate();},activeTab=="shop");
+            Button(g,"外观",414,28,70,34,()=>{activeTab="style";Invalidate();},activeTab=="style");
+            Button(g,"设置",492,28,70,34,()=>{activeTab="settings";Invalidate();},activeTab=="settings");
             Button(g,"回到桌面",574,28,122,34,ToggleCompact,true);
-            if(activeTab=="shop")DrawShopPage(g);else if(activeTab=="style")DrawStylePage(g);else DrawOverview(g);
+            if(activeTab=="shop")DrawShopPage(g);else if(activeTab=="style")DrawStylePage(g);else if(activeTab=="settings")DrawSettingsPage(g);else if(activeTab=="month")DrawMonth(g);else DrawOverview(g);
             string footer=saveError!=""?"保存失败 · 右键菜单查看数据路径":!rawOk&&!renderOnly?"鼠标监听未启动 · 请重启":store.Notice!=""?store.Notice:"仅本地记录 · 隐藏搭子后继续统计";
             Ellipse(g,saveError!=""?Color.Firebrick:green,26,529,6,6);Txt(g,footer,39,522,12,muted,false);
-            Txt(g,"v0.8.0",649,522,12,muted,false);
+            Txt(g,"v0.9.0",649,522,12,muted,false);
         }
         void DrawOverview(Graphics g) {
             Day d=model.Today(DateTime.Now);Panel(g,24,88,672,160);
@@ -361,6 +382,7 @@ namespace OfficeBuddy {
             string[] names={"左键","右键","中键","侧键"};long[] nums={d.Buttons[0],d.Buttons[1],d.Buttons[2],d.Buttons[3]+d.Buttons[4]};
             for(int i=0;i<4;i++){float x=44+i*97;Txt(g,names[i],x,218,12,muted,false);Txt(g,nums[i].ToString("N0"),x+31,215,15,ink,true);}
             Panel(g,24,264,412,234);Txt(g,"这一周",44,284,18,ink,true);Txt(g,"每天的忙碌，都有被记住。",44,315,13,muted,false);
+            Button(g,"查看月度",312,278,104,30,()=>{activeTab="month";Invalidate();},false);
             Chart(g,45,370,370,86);
             Panel(g,452,264,244,234);Txt(g,"今日状态",472,284,18,ink,true);
             Button(g,"一起开工",472,324,204,38,()=>Mode("work"),mode=="work");
@@ -422,7 +444,7 @@ namespace OfficeBuddy {
                 float y=Math.Max(12,petTop-190);Card(g,Surface,24,y,272,170);
                 Txt(g,Skin=="pixel"?"薄荷 · 上班搭子":SkinName,40,y+12,15,PrimaryText,true);
                 Fill(g,Skin=="midnight"?C("#344C40"):C("#EAF0E4"),231,y+12,49,22,7);
-                Center(g,model.Paused?"暂停":mode=="rest"?"午休":mode=="water"?"喝水":"在线",new RectangleF(231,y+12,49,22),12,Accent,true);
+                Center(g,model.Paused?"暂停":mode=="rest"?"午休":mode=="water"?"喝水":AutoClosed?"睡眠":"在线",new RectangleF(231,y+12,49,22),12,Accent,true);
                 Txt(g,saveError!=""?"记录保存失败，请查看菜单。":Speech(),40,y+41,14,PrimaryText,false);
                 Txt(g,"今日点击",40,y+77,13,PrimaryText,false);
                 Center(g,model.Today(DateTime.Now).Total.ToString("N0"),new RectangleF(109,y+65,122,43),29,Accent,true);
@@ -461,7 +483,7 @@ namespace OfficeBuddy {
             PointF[] center={new PointF(139,127)};using(var transform=g.Transform)transform.TransformPoints(center);
             Point mouse=Cursor.Position;
             Point origin=PointToScreen(Point.Empty);
-            return new PointF((float)Math.Max(-3.5,Math.Min(3.5,(mouse.X-origin.X-center[0].X)/90)),(float)Math.Max(-1.8,Math.Min(1.8,(mouse.Y-origin.Y-center[0].Y)/130)));
+            return new PointF(MotionStrength*(float)Math.Max(-3.5,Math.Min(3.5,(mouse.X-origin.X-center[0].X)/90)),MotionStrength*(float)Math.Max(-1.8,Math.Min(1.8,(mouse.Y-origin.Y-center[0].Y)/130)));
         }
         void PixelShape(Graphics g,Color color,PointF[] points){using(var brush=new SolidBrush(color))g.FillPolygon(brush,points);}
         void CatEye(Graphics g,float x,float y,float size,bool closed,PointF gaze) {
@@ -480,22 +502,23 @@ namespace OfficeBuddy {
             if(model.IsPlaced("cushion"))Decor(g,"cushion",56,122,2.2f);
             if(model.IsPlaced("lamp"))Decor(g,"lamp",263,181,0.75f);
             if(model.IsPlaced("clock"))Decor(g,"clock",21,190,0.58f);
-            var st=g.Save();g.TranslateTransform(0,(float)Math.Sin(phase*2)*1.2f);
+            var st=g.Save();float bounce=companion.Mood==CompanionMood.Happy?-(float)Math.Abs(Math.Sin(phase*6))*4:companion.Mood==CompanionMood.Waking?-(float)Math.Abs(Math.Sin(phase*9))*3:0;g.TranslateTransform(0,MotionStrength*((float)Math.Sin(phase*2)*1.2f+bounce));
             g.InterpolationMode=InterpolationMode.NearestNeighbor;g.PixelOffsetMode=PixelOffsetMode.Half;
             bool waterPhoto=Skin=="pixel"&&mode=="water";
             Bitmap sprite=waterPhoto?waterSprite:body;
             if(sprite!=null){float height=232f*sprite.Height/sprite.Width;g.DrawImage(sprite,new RectangleF(18,217-height,232,height));}
             else DrawUserCharacter(g,phase);
             if(!waterPhoto&&Skin=="pixel") {
-                bool blink=mode=="rest"||mode=="water"||(renderOnly&&previewBlink.HasValue?previewBlink.Value:phase%4.4>4.13);
+                bool blink=mode=="rest"||mode=="water"||AutoClosed||(renderOnly&&previewBlink.HasValue?previewBlink.Value:phase%4.4>4.13);
                 PointF gaze=EyeGaze(g);CatEye(g,112,117,1,blink,gaze);CatEye(g,157,126,0.80f,blink,gaze);
                 float idle=mode=="work"&&phase%9>7.8?(float)Math.Sin((phase%9-7.8)*Math.PI/1.2)*3:0;
-                CatPaw(g,117,mode=="water"?144:167,1,mode=="work"?HandLift(leftTap)+idle:0);
-                CatPaw(g,151,167,0.70f,mode=="work"?HandLift(rightTap):0);
+                CatPaw(g,117,mode=="water"?144:167,1,mode=="work"&&!AutoClosed?MotionStrength*(HandLift(leftTap)+idle):0);
+                CatPaw(g,151,167,0.70f,mode=="work"&&!AutoClosed?MotionStrength*HandLift(rightTap):0);
                 if(mode=="water")Decor(g,"cup",117,125,0.62f);
             }
-            g.Restore(st);
-            if(mode=="rest"){Txt(g,"z",225,34,20,C("#6A8274"),true);Txt(g,"z",240,18,15,C("#6A8274"),true);}
+            DrawYawn(g);g.Restore(st);
+            if(mode=="rest"||companion.Mood==CompanionMood.Sleeping){Txt(g,"z",225,34,20,C("#6A8274"),true);Txt(g,"z",240,18,15,C("#6A8274"),true);}
+            DrawEmotion(g);
             Decorations(g);
         }
         RectangleF UserSpriteBounds {get{return new RectangleF(28,7,210,210);}}
@@ -513,14 +536,14 @@ namespace OfficeBuddy {
             if(original==null)return;
             SpriteMotion motion=Skin=="cream"?rabbitMotion:nightMotion;
             if(motion==null){motion=new SpriteMotion(original,Skin=="cream"?rabbitRig:nightRig,210,UserEye(false),UserEye(true),UserHand(false),UserHand(true));if(Skin=="cream")rabbitMotion=motion;else nightMotion=motion;}
-            bool closed=mode=="rest"||mode=="water"||(renderOnly&&previewBlink.HasValue?previewBlink.Value:phase%4.4>4.13);
+            bool closed=mode=="rest"||mode=="water"||AutoClosed||(renderOnly&&previewBlink.HasValue?previewBlink.Value:phase%4.4>4.13);
             PointF gaze=EyeGaze(g);
-            float left=mode=="work"?HandLift(leftTap):mode=="water"?22:0,right=mode=="work"?HandLift(rightTap):0;
+            float left=mode=="work"&&!AutoClosed?MotionStrength*HandLift(leftTap):mode=="water"?22:0,right=mode=="work"&&!AutoClosed?MotionStrength*HandLift(rightTap):0;
             g.DrawImage(motion.Render(closed,gaze,left,right),UserSpriteBounds);
             if(mode=="water")Decor(g,"cup",119,142,0.62f);
         }
         protected override void Dispose(bool disposing) {
-            if(disposing){if(rabbitMotion!=null)rabbitMotion.Dispose();if(nightMotion!=null)nightMotion.Dispose();timer.Dispose();}
+            if(disposing){if(reminderWindow!=null)reminderWindow.Close();if(rabbitMotion!=null)rabbitMotion.Dispose();if(nightMotion!=null)nightMotion.Dispose();timer.Dispose();}
             base.Dispose(disposing);
         }
         void Decorations(Graphics g) {
@@ -530,7 +553,7 @@ namespace OfficeBuddy {
         void Decor(Graphics g,string id,float x,float y,float s) {
             PixelDecor.Draw(g,id,x,y,s,Skin=="midnight");
         }
-        public void SetPreviewTab(string name){activeTab=name=="shop"?"shop":name=="style"?"style":"overview";}
+        public void SetPreviewTab(string name){activeTab=new[]{"shop","style","settings","month"}.Contains(name)?name:"overview";}
         public void Catalog(string path) {
             string original=Skin;model.Data.Owned.Clear();mode="work";previewPhase=0.5;previewBlink=false;
             using(var b=new Bitmap(1100,570,System.Drawing.Imaging.PixelFormat.Format32bppPArgb)) {
@@ -655,7 +678,7 @@ namespace OfficeBuddy {
             if(leftTap!=0||rightTap!=0||renders-startRenders<8)throw new Exception("live motion did not settle or repaint");
             report.Add("PASS: click input triggers independent hands; real UI timer advances, repaints and settles motion");
             float petPixels=scale*model.Data.PetScale/model.Data.Zoom;ChooseZoom(120);if(Math.Abs(ClientSize.Width-320*Native.Dpi(Handle)*1.2)>2)throw new Exception("DPI/zoom sizing failed");if(Math.Abs(scale*model.Data.PetScale/model.Data.Zoom-petPixels)>0.02)throw new Exception("text zoom changed pet size");ChooseZoom(100);report.Add("PASS: DPI-aware text sizing leaves pet size unchanged");
-            report.Add("successful alpha renders="+renders);return string.Join("\n",report);
+            report.Add(CheckFeatureWindows());report.Add("successful alpha renders="+renders);return string.Join("\n",report);
         }
         public bool RawReady {get {return rawOk;}}
         public void SuppressNotifications(){notifications=false;}
@@ -666,6 +689,9 @@ namespace OfficeBuddy {
             Native.EnableDpi();Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
             try {
                 if(args.Length>0 && args[0]=="--self-test") {Tests.Run(args[1]);return 0;}
+                if(args.Length>0 && args[0]=="--settings-preview") {using(var f=new BuddyForm(new Model(new SaveData()),new Store(""),true))f.SettingsPreview(args[1],args.Length>2?int.Parse(args[2]):0);return 0;}
+                if(args.Length>0 && args[0]=="--feature-poses") {using(var f=new BuddyForm(new Model(new SaveData{Theme=args.Length>2?args[2]:"pixel"}),new Store(""),true))f.FeaturePose(args[1]);return 0;}
+                if(args.Length>0 && args[0]=="--companion-showcase") {using(var f=new BuddyForm(new Model(new SaveData{Theme=args.Length>2?args[2]:"pixel"}),new Store(""),true))f.CompanionShowcase(args[1]);return 0;}
                 if(args.Length>0 && args[0]=="--catalog") {using(var f=new BuddyForm(new Model(new SaveData()),new Store(""),true))f.Catalog(args[1]);return 0;}
                 if(args.Length>0 && args[0]=="--overlay-test") {OverlayTest(args[1],args.Length>2?args[2]:"pixel");return File.ReadAllText(args[1]).StartsWith("PASS:")?0:1;}
                 if(args.Length>0 && args[0]=="--motion-frames") {using(var f=new BuddyForm(new Model(new SaveData{Theme=args.Length>2?args[2]:"pixel"}),new Store(""),true))f.MotionFrames(args[1]);return 0;}
@@ -722,6 +748,7 @@ namespace OfficeBuddy {
             }
         }
         public static void Run(string output) {
+            FeatureChecks.Run(Assert,Path.GetDirectoryName(output));
             CheckFixedEyes();
             Assert(BuddyForm.ArtworkReady,"body layer and companion assets embedded with transparent corners");
             using(var f=new BuddyForm(new Model(new SaveData()),new Store(""),true))Assert(f.CheckHoverRendering(),"hover shows panel, bridge preserves access, leaving hides immediately, messages stay hidden; all themes and sizes");
@@ -746,7 +773,7 @@ namespace OfficeBuddy {
             Store empty=new Store(Path.Combine(folder,"new.json"));Assert(empty.Load().Lifetime.Sum()==0,"fresh installation starts at zero");
             File.WriteAllText(empty.Path,"{\"Version\":1,\"Lifetime\":[0,0,0,0,0],\"Days\":[],\"Coins\":0,\"Owned\":[\"lamp\"]}");var legacy=empty.Load();Assert(legacy.Theme=="pixel"&&legacy.Zoom==100&&legacy.PetScale==55,"legacy save migration to small pet");
             Assert(legacy.Equipped.SequenceEqual(new[]{"lamp"}),"old saves preserve existing decoration placement");
-            File.WriteAllText(output,"PASS: "+count+" assertions\nHover rendering, counting, five buttons, pause, daily rewards, purchases, rollover, persistence and recovery verified.");
+            File.WriteAllText(output,"PASS: "+count+" assertions\nPlacement, settings migration, idle moods, reminders, DND, snooze, month statistics, CSV, safe restore, hover, counting, rewards and persistence verified.");
         }
     }
 }

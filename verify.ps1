@@ -9,7 +9,7 @@ function Invoke-BuddyCheck([string]$flag,[string]$output,[string]$theme = '') {
     if ($theme) { $taskArgs += $theme }
     $taskProcess = Start-Process -FilePath $taskApp -ArgumentList $taskArgs -WindowStyle Hidden -PassThru -Wait
     if ($taskProcess.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $output)) { throw ('验证失败：' + $flag + ' ' + $theme) }
-    $taskReport = Get-Content -LiteralPath $output -Raw
+    $taskReport = Get-Content -LiteralPath $output -Raw -Encoding UTF8
     Write-Output $taskReport
     if ($taskReport -match 'FAIL:') { throw ('检查未通过：' + $theme) }
 }
