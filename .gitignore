@@ -1,0 +1,12 @@
+*.exe
+*.pdb
+*.zip
+diagnostic-error.txt
+work/
+save.json*
+overlay-test-save.json*
+probe-save.json*
+test-store-*/
+Thumbs.db
+.DS_Store
+v05-*.png
