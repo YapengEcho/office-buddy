@@ -27,7 +27,7 @@ namespace OfficeBuddy {
             sleep=Check(daily,"空闲后自动睡眠",18,52,original.AutoSleep);LabelAt(daily,"空闲秒数",304,58);idle=Number(daily,428,53,30,3600,original.IdleSeconds);
             LabelAt(daily,"动作幅度",18,102);motion=Choice(daily,128,96,142,new[]{"静止（仍眨眼）","轻柔 · 50%","标准 · 100%","活泼 · 150%"},Array.IndexOf(new[]{0,50,100,150},original.MotionPercent));
             LabelAt(daily,"显隐快捷键",304,102);hotkey=Choice(daily,428,96,154,new[]{"关闭快捷键","Ctrl+Alt+B","Ctrl+Shift+B","Ctrl+Alt+F8"},Array.IndexOf(new[]{"None","Ctrl+Alt+B","Ctrl+Shift+B","Ctrl+Alt+F8"},original.Hotkey));
-            LabelAt(daily,"今天的搭子",18,148);theme=Choice(daily,128,142,142,new[]{"薄荷像素","杏桃糯米兔","月光夜猫"},data.Theme=="cream"?1:data.Theme=="midnight"?2:0);
+            LabelAt(daily,"今天的搭子",18,148);theme=Choice(daily,128,142,142,BuddyForm.ThemeNames,Array.IndexOf(BuddyForm.Themes,data.Theme));
             LabelAt(daily,"角色大小",304,148);size=Choice(daily,428,142,154,new[]{"迷你","小号 · 默认","中号"},Array.IndexOf(new[]{40,55,70},data.PetScale));
             LabelAt(daily,"文字大小",18,194);zoom=Choice(daily,128,188,142,new[]{"100%","120%","140%"},Array.IndexOf(new[]{100,120,140},data.Zoom));
             ButtonAt(daily,"找回桌宠位置",304,188,278,()=>{Tag="reset-position";status.Text="保存设置后，桌宠会回到当前屏幕右下角。";});
@@ -64,7 +64,7 @@ namespace OfficeBuddy {
             if(a>=b){status.Text="工作结束时间需要晚于开始时间。";tabs.SelectedIndex=1;return;}
             var s=original.Copy();s.PositionLocked=locked.Checked;s.CountOwnClicks=own.Checked;s.AutoSleep=sleep.Checked;s.IdleSeconds=(int)idle.Value;s.MotionPercent=new[]{0,50,100,150}[motion.SelectedIndex];s.Hotkey=new[]{"None","Ctrl+Alt+B","Ctrl+Shift+B","Ctrl+Alt+F8"}[hotkey.SelectedIndex];
             s.Reminders=reminders.Checked;s.Water=water.Checked;s.Rest=rest.Checked;s.Offwork=offwork.Checked;s.DoNotDisturb=dnd.Checked;s.WeekdaysOnly=weekdays.Checked;s.StartMinute=a;s.EndMinute=b;s.WaterMinutes=(int)waterEvery.Value;s.RestMinutes=(int)restEvery.Value;
-            try{apply(new SettingsDraft{Preferences=s,Startup=startup.Checked,Theme=new[]{"pixel","cream","midnight"}[theme.SelectedIndex],Zoom=new[]{100,120,140}[zoom.SelectedIndex],PetScale=new[]{40,55,70}[size.SelectedIndex]});DialogResult=DialogResult.OK;Close();}catch(Exception e){status.Text=e.Message;}
+            try{apply(new SettingsDraft{Preferences=s,Startup=startup.Checked,Theme=BuddyForm.Themes[theme.SelectedIndex],Zoom=new[]{100,120,140}[zoom.SelectedIndex],PetScale=new[]{40,55,70}[size.SelectedIndex]});DialogResult=DialogResult.OK;Close();}catch(Exception e){status.Text=e.Message;}
         }
         public void Preview(string path){Show();using(var bitmap=new Bitmap(Width,Height)){DrawToBitmap(bitmap,new Rectangle(0,0,Width,Height));bitmap.Save(path,System.Drawing.Imaging.ImageFormat.Png);}Close();}
     }

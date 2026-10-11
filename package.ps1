@@ -1,21 +1,21 @@
 ﻿param([string]$OutputDirectory = (Join-Path $PSScriptRoot 'work\packages'))
 $ErrorActionPreference='Stop'
-$taskVersion='0.9.0'
+$taskVersion='0.10.2'
 $taskOutput=[IO.Path]::GetFullPath($OutputDirectory)
 $taskSource=Join-Path $taskOutput ('office-buddy-github-v'+$taskVersion)
 $taskPortable=Join-Path $taskOutput ('OfficeBuddyStudio-v'+$taskVersion+'-windows-x64')
 foreach($taskZipName in @(('office-buddy-v'+$taskVersion+'-source.zip'),('OfficeBuddyStudio-v'+$taskVersion+'-windows-x64.zip'))) {
     if(Test-Path -LiteralPath (Join-Path $taskOutput $taskZipName)){throw '同版本 ZIP 已存在，请使用新的 -OutputDirectory。'}
 }
-$taskFiles=@('OfficeBuddy.cs','SpriteMotion.cs','PixelEye.cs','PixelDecor.cs','WorkFeatures.cs','BuddyFeatures.cs','SettingsForm.cs','FeatureChecks.cs','application.manifest',
+$taskFiles=@('OfficeBuddy.cs','SpriteMotion.cs','PixelEye.cs','PixelDecor.cs','WorkFeatures.cs','BuddyFeatures.cs','SettingsForm.cs','FeatureChecks.cs','NailongPet.cs','NailongVideo.cs','application.manifest',
     'build.ps1','verify.ps1','check-motion.py','package.ps1','.gitignore','.gitattributes','LICENSE',
-    'README.md','RUNNING.md','ASSETS.md','DESIGN.md','CONTRIBUTING.md','CHANGELOG.md',
-    '像素搭子.cmd','奶油搭子.cmd','夜猫搭子.cmd','统一眼睛与手.gif','睡眠与互动.gif',
+    'README.md','RUNNING.md','ASSETS.md','NAILONG-NOTES.md','DESIGN.md','CONTRIBUTING.md','CHANGELOG.md',
+    '像素搭子.cmd','奶油搭子.cmd','夜猫搭子.cmd','统一眼睛与手.gif','睡眠与互动.gif','抽象奶龙大笑.gif','奶龙左右手.gif','v0102-nailong.png','抽象奶龙.cmd',
     'v090-catalog.png','v090-quiet.png','v090-compact.png','v090-overview.png','v090-shop.png','v090-style.png','v090-month.png','v090-settings.png','v090-settings-daily.png','v090-settings-work.png','v090-settings-data.png',
     '.github\workflows\build.yml',
     'assets\mint-cat.png','assets\mint-cat-rig.png','assets\mint-cat-water.png',
-    'assets\apricot-rabbit.png','assets\apricot-rabbit-rig.png','assets\moon-cat.png','assets\moon-cat-rig.png')
-$taskRuntimeFiles=@('OfficeBuddyStudio.exe','LICENSE','RUNNING.md','CHANGELOG.md','像素搭子.cmd','奶油搭子.cmd','夜猫搭子.cmd')
+    'assets\apricot-rabbit.png','assets\apricot-rabbit-rig.png','assets\moon-cat.png','assets\moon-cat-rig.png','assets\nailong-atlas.png')
+$taskRuntimeFiles=@('OfficeBuddyStudio.exe','NAILONG-NOTES.md','LICENSE','RUNNING.md','CHANGELOG.md','像素搭子.cmd','奶油搭子.cmd','夜猫搭子.cmd','抽象奶龙.cmd')
 function Copy-Allowlist([string]$target,[string[]]$files) {
     # Refuse foreign/stale files instead of silently including or deleting them.
     if(Test-Path -LiteralPath $target) {

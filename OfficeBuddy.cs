@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -88,7 +88,7 @@ namespace OfficeBuddy {
                        d.Buttons.Any(x=>x<0) || d.Earned<0 || d.Earned>20) ||
                    data.Days.Select(d=>d.Date).Distinct().Count()!=data.Days.Count)
                     throw new InvalidDataException("存档结构不完整。");
-                if(data.Theme!="cream"&&data.Theme!="midnight")data.Theme="pixel";
+                if(!BuddyForm.Themes.Contains(data.Theme))data.Theme="pixel";
                 if(data.Zoom!=120&&data.Zoom!=140)data.Zoom=100;
                 if(data.PetScale!=40&&data.PetScale!=70)data.PetScale=55;
                 data.Equipped=(data.Equipped??data.Owned).Intersect(data.Owned).Distinct().ToList();
@@ -180,11 +180,11 @@ namespace OfficeBuddy {
         SpriteMotion rabbitMotion,nightMotion;
         static Bitmap LoadSprite(string name){using(var stream=System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("OfficeBuddy."+name+".png")){if(stream==null)return null;using(var original=new Bitmap(stream))return new Bitmap(original);}}
         public static bool ArtworkReady {get{return catSprite!=null&&waterSprite!=null&&rigSprite!=null&&rabbitSprite!=null&&nightSprite!=null&&rabbitRig!=null&&nightRig!=null&&rabbitSprite.Size==rabbitRig.Size&&nightSprite.Size==nightRig.Size&&rabbitSprite.GetPixel(0,0).A==0&&nightSprite.GetPixel(0,0).A==0&&rigSprite.GetPixel(0,0).A==0&&waterSprite.GetPixel(0,0).A==0;}}
-        string Skin {get{return model.Data.Theme=="cream"||model.Data.Theme=="midnight"?model.Data.Theme:"pixel";}}
-        string SkinName {get{return Skin=="pixel"?"薄荷像素":Skin=="cream"?"杏桃糯米兔":"月光夜猫";}}
-        Color Surface {get{return Skin=="pixel"?C("#FCFCF9"):Skin=="cream"?C("#FFF9F0"):C("#1F2930");}}
+        string Skin {get{return Themes.Contains(model.Data.Theme)?model.Data.Theme:"pixel";}}
+        string SkinName {get{return ThemeNames[Array.IndexOf(Themes,Skin)];}}
+        Color Surface {get{return Skin=="midnight"?C("#1F2930"):Skin=="cream"||Skin=="nailong"?C("#FFF9F0"):C("#FCFCF9");}}
         Color PrimaryText {get{return Skin=="midnight"?C("#F2F5F3"):C("#303A35");}}
-        Color Accent {get{return Skin=="pixel"?C("#4D7160"):Skin=="cream"?C("#995B40"):C("#8ED7BC");}}
+        Color Accent {get{return Skin=="nailong"?C("#976117"):Skin=="pixel"?C("#4D7160"):Skin=="cream"?C("#995B40"):C("#8ED7BC");}}
         static Color C(string hex){return ColorTranslator.FromHtml(hex);}
         public BuddyForm(Model m,Store s,bool preview) {
             model=m; store=s; renderOnly=preview;InitializeFeatures();ApplyPalette();if(model.Data.Zoom!=120&&model.Data.Zoom!=140)model.Data.Zoom=100;
@@ -197,7 +197,7 @@ namespace OfficeBuddy {
             Icon=MakeIcon();
             MouseMove+=(o,e)=>{if(dragging){Point p=Cursor.Position;justDragged|=Math.Abs(p.X-dragOrigin.X)+Math.Abs(p.Y-dragOrigin.Y)>4;Location=PetPlacement.Constrain(new Point(windowOrigin.X+p.X-dragOrigin.X,windowOrigin.Y+p.Y-dragOrigin.Y),ClientSize,WorkingAreas);}bool changed=compact?UpdatePointerHover():false;if(!compact)hover=new PointF(e.X/scale,e.Y/scale);Cursor=hits.Any(h=>h.Item1.Contains(hover))?Cursors.Hand:compact&&!Preferences.PositionLocked?Cursors.SizeAll:Cursors.Default;if(changed)RenderLayer();};
             MouseLeave+=(o,e)=>{if(compact){if(UpdatePointerHover())RenderLayer();}else hover=new PointF(-1,-1);};
-            MouseClick+=(o,e)=>{if(e.Button==MouseButtons.Left) { var h=hits.LastOrDefault(x=>x.Item1.Contains(new PointF(e.X/scale,e.Y/scale))); if(h!=null) h.Item2();else if(compact&&!justDragged){companion.Happy(DateTime.UtcNow);Say("摸摸头，好啦，一起忙。",3);RenderLayer();} }};
+            MouseClick+=(o,e)=>{if(e.Button==MouseButtons.Left) { var h=hits.LastOrDefault(x=>x.Item1.Contains(new PointF(e.X/scale,e.Y/scale))); if(h!=null) h.Item2();else if(compact&&!justDragged){if(Skin=="nailong"){Say("收到了，一起慢慢忙。",2);RenderLayer();}else{companion.Happy(DateTime.UtcNow);Say("摸摸头，好啦，一起忙。",3);RenderLayer();}} }};
             MouseDown+=(o,e)=>{justDragged=false;if(compact && !Preferences.PositionLocked && e.Button==MouseButtons.Left && e.Y/scale>100 && e.Y/scale<358 && !hits.Any(h=>h.Item1.Contains(new PointF(e.X/scale,e.Y/scale)))) {dragging=true;dragOrigin=Cursor.Position;windowOrigin=Location;Capture=true;}};
             MouseUp+=(o,e)=>{if(dragging&&justDragged){SavePetPosition();Persist();}dragging=false;Capture=false;};
             MouseClick+=(o,e)=>{if(e.Button==MouseButtons.Right && trayMenu!=null) trayMenu.Show(this,e.Location);};
@@ -208,7 +208,7 @@ namespace OfficeBuddy {
         }
         protected override CreateParams CreateParams {get {var p=base.CreateParams;if(compact)p.ExStyle|=0x80000|0x80|0x08000000;return p;}}
         protected override bool ShowWithoutActivation {get{return compact;}}
-        void ApplyPalette(){ink=C("#303A35");green=Skin=="cream"?C("#936A50"):Skin=="midnight"?C("#496B7D"):C("#4D7160");cream=C("#F5F5F0");muted=C("#68736C");orange=C("#BD8C53");}
+        void ApplyPalette(){ink=C("#303A35");green=Skin=="nailong"?C("#976117"):Skin=="cream"?C("#936A50"):Skin=="midnight"?C("#496B7D"):C("#4D7160");cream=C("#F5F5F0");muted=C("#68736C");orange=C("#BD8C53");}
         void ResizeDpi(float dpi){float factor=dpi*(compact?model.Data.Zoom/100f:1);if(!compact){Rectangle a=Screen.FromControl(this).WorkingArea;factor=Math.Min(factor,Math.Min((a.Width-40)/720f,(a.Height-60)/560f));}ClientSize=new Size((int)((compact?320:720)*factor),(int)((compact?360:560)*factor));}
         void ChooseTheme(string theme){model.Data.Theme=theme;ApplyPalette();dirty=true;Persist();Say("换好啦，今天也一起忙。",4);if(compact)RenderLayer();else Invalidate();}
         void ChooseZoom(int zoom){model.Data.Zoom=zoom;dirty=true;ResizeDpi(Native.Dpi(Handle));Rectangle a=Screen.FromControl(this).WorkingArea;Location=new Point(Math.Max(a.Left,Math.Min(Left,a.Right-Width)),Math.Max(a.Top,Math.Min(Top,a.Bottom-Height)));Persist();if(compact)RenderLayer();else Invalidate();}
@@ -251,7 +251,8 @@ namespace OfficeBuddy {
                 var locked=new ToolStripMenuItem("锁定位置"){Checked=Preferences.PositionLocked};locked.Click+=(a,b)=>{Preferences.PositionLocked=!Preferences.PositionLocked;dirty=true;Persist();};trayMenu.Items.Add(locked);
                 var dnd=new ToolStripMenuItem("勿扰 · 不弹出提醒"){Checked=Preferences.DoNotDisturb};dnd.Click+=(a,b)=>ToggleDnd();trayMenu.Items.Add(dnd);
                 var skins=new ToolStripMenuItem("外观 · "+SkinName);
-                foreach(string name in new[]{"pixel","cream","midnight"}) {string choice=name;var item=new ToolStripMenuItem(name=="pixel"?"像素风 · 薄荷":name=="cream"?"像素风 · 糯米兔":"像素风 · 月光");item.Checked=Skin==name;item.Click+=(a,b)=>ChooseTheme(choice);skins.DropDownItems.Add(item);}trayMenu.Items.Add(skins);
+                foreach(string name in Themes) {string choice=name;var item=new ToolStripMenuItem(ThemeNames[Array.IndexOf(Themes,name)]);item.Checked=Skin==name;item.Click+=(a,b)=>ChooseTheme(choice);skins.DropDownItems.Add(item);}trayMenu.Items.Add(skins);
+                if(Skin=="nailong")trayMenu.Items.Add("捧腹大笑一下",null,(a,b)=>{Mode("work");LaughNow();});
                 var petSize=new ToolStripMenuItem("角色大小");foreach(int value in new[]{40,55,70}){int choice=value;var item=new ToolStripMenuItem(value==40?"迷你":value==55?"小号 · 默认":"中号");item.Checked=model.Data.PetScale==value;item.Click+=(a,b)=>ChoosePetSize(choice);petSize.DropDownItems.Add(item);}trayMenu.Items.Add(petSize);
                 var sizeMenu=new ToolStripMenuItem("文字大小");foreach(int value in new[]{100,120,140}){int choice=value;var item=new ToolStripMenuItem(value+"%"+(value==100?" · 标准":value==120?" · 大字":" · 更大"));item.Checked=model.Data.Zoom==value;item.Click+=(a,b)=>ChooseZoom(choice);sizeMenu.DropDownItems.Add(item);}trayMenu.Items.Add(sizeMenu);
                 trayMenu.Items.Add(model.Paused?"继续统计":"暂停统计",null,(a,b)=>Pause());
@@ -271,7 +272,7 @@ namespace OfficeBuddy {
         protected override void WndProc(ref Message msg) {
             if(msg.Msg==0x312&&!renderOnly&&msg.WParam.ToInt32()==0x4F42){ToggleVisibility();return;}
             if(msg.Msg==0x7E&&!renderOnly&&compact){Location=PetPlacement.Constrain(Location,ClientSize,WorkingAreas);SavePetPosition();RenderLayer();}
-            if((uint)msg.Msg==Native.ThemeMessage&&!renderOnly){int choice=msg.WParam.ToInt32();ChooseTheme(choice==1?"cream":choice==2?"midnight":"pixel");ShowBuddy();return;}
+            if((uint)msg.Msg==Native.ThemeMessage&&!renderOnly){int choice=msg.WParam.ToInt32();ChooseTheme(choice>=0&&choice<Themes.Length?Themes[choice]:"pixel");ShowBuddy();return;}
             if(msg.Msg==0x2E0&&!renderOnly){ResizeDpi((msg.WParam.ToInt64()&0xFFFF)/96f);Rectangle area=Screen.FromControl(this).WorkingArea;Location=new Point(Math.Max(area.Left,Math.Min(Left,area.Right-Width)),Math.Max(area.Top,Math.Min(Top,area.Bottom-Height)));if(compact)RenderLayer();return;}
             if(msg.Msg==0xFF && !renderOnly) {
                 uint size=0,hs=(uint)Marshal.SizeOf(typeof(Native.Header));
@@ -292,9 +293,10 @@ namespace OfficeBuddy {
             bool own=!Preferences.CountOwnClicks&&IsOwnClick();if(model.Paused||own)return;
             int gain=model.Click(button,DateTime.Now,own);
             dirty=true;lastInput=DateTime.UtcNow;lastButton=button;anim=1;
+            if(Skin=="nailong"&&mode=="work"&&nailong.Click(NailongNow,button))Say("哈哈哈，肚子都笑圆了。",4);
             if(button==0||button==2||button==3)leftTap=1;
             if(button==1||button==2||button==4)rightTap=1;
-            timer.Interval=25;
+            timer.Interval=Skin=="nailong"?16:25;
             if(gain>0) Say("叮，攒到一枚搭子币！",4);
         }
         void Tick() {
@@ -304,7 +306,7 @@ namespace OfficeBuddy {
             if(dayKey!=key) {dayKey=key;model.Today(DateTime.Now);dirty=true;}
             if(dirty && (DateTime.UtcNow-lastSave).TotalSeconds>=5) Persist();
             if(Visible && WindowState!=FormWindowState.Minimized) {if(compact){UpdatePointerHover();RenderLayer();}else Invalidate();}
-            timer.Interval=anim>0||leftTap>0||rightTap>0?25:Visible&&compact?60:Visible?100:1000;
+            timer.Interval=Skin=="nailong"&&nailong.Animating(NailongNow)?16:anim>0||leftTap>0||rightTap>0?25:Visible&&compact?60:Visible?100:1000;
         }
         bool Persist() {try {store.Save(model.Data);dirty=false;lastSave=DateTime.UtcNow;saveError="";return true;} catch(Exception e) {saveError=e.Message;lastSave=DateTime.UtcNow;return false;}}
         void Say(string text,int seconds) { bubble=text;bubbleUntil=DateTime.UtcNow.AddSeconds(seconds);Invalidate(); }
@@ -329,7 +331,7 @@ namespace OfficeBuddy {
             dirty=true;Persist();Say("收到了！我的"+item.Name+"，谢谢你。",8);
             companion.Happy(DateTime.UtcNow);
         }
-        void About() {MessageBox.Show("上班搭子 · 薄荷像素 v0.9.0\n\n右键菜单可切换外观；角色大小与文字大小独立调整。\n默认透明背景，无边框，不抢当前窗口焦点。\n拖动搭子移动位置；靠近时显示计数和互动按钮。\n右键搭子或托盘可打开菜单，查看统计及布置工位。\n\n左右中键、两个侧键：按下一次计一次。\n双击计两次，滚动和松开不计数。软件自身的点击也计数。\n每 100 次点击获得 1 枚搭子币，每日最多 20 枚。\n暂停时停止计数；喝水与午休只切换动作。\n隐藏或最小化后继续统计；关闭工位窗口会回到桌宠。\n要结束程序，请右键菜单选择“退出”。\n\n仅记录每日各按键次数、累计次数和装饰。\n不记录坐标、窗口标题或键盘，不联网；开机启动可在设置中选择。\n每日按电脑本地日期结算，每 5 秒保存一次。\n\n存档："+store.Path+"\n\n背景透明部分可直接操作下方窗口。托盘还可开启整个搭子的鼠标穿透。\n全屏独占游戏、远程桌面及特殊输入设备尚未逐一验证。"+(layerError!=""?"\n\n"+layerError:""), "关于上班搭子",MessageBoxButtons.OK,MessageBoxIcon.Information);}
+        void About() {MessageBox.Show("上班搭子 v0.10.2\n\n右键菜单可切换外观；角色大小与文字大小独立调整。\n默认透明背景，无边框，不抢当前窗口焦点。\n拖动搭子移动位置；靠近时显示计数和互动按钮。\n右键搭子或托盘可打开菜单，查看统计及布置工位。\n\n左右中键、两个侧键：按下一次计一次。\n双击计两次，滚动和松开不计数。软件自身的点击默认计数，可在设置中关闭。\n每 100 次点击获得 1 枚搭子币，每日最多 20 枚。\n暂停时停止计数；喝水与午休只切换动作。\n隐藏或最小化后继续统计；关闭工位窗口会回到桌宠。\n要结束程序，请右键菜单选择“退出”。\n\n仅记录每日各按键次数、累计次数和装饰。\n不记录坐标、窗口标题或键盘，不联网；开机启动可在设置中选择。\n每日按电脑本地日期结算，每 5 秒保存一次。\n\n存档："+store.Path+"\n\n背景透明部分可直接操作下方窗口。托盘还可开启整个搭子的鼠标穿透。\n全屏独占游戏、远程桌面及特殊输入设备尚未逐一验证。"+(layerError!=""?"\n\n"+layerError:""), "关于上班搭子",MessageBoxButtons.OK,MessageBoxIcon.Information);}
         protected override void OnPaint(PaintEventArgs e) {
             base.OnPaint(e); Graphics g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;g.TextRenderingHint=System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             hits.Clear();scale=ClientSize.Width/(compact?320f:720f);g.ScaleTransform(scale,scale);g.Clear(compact?Color.Transparent:cream);
@@ -348,6 +350,7 @@ namespace OfficeBuddy {
         }
         string Speech() {
             if(DateTime.UtcNow<bubbleUntil) return bubble;
+            if(Skin=="nailong"&&mode=="work"&&!AutoClosed&&nailong.Laughing(NailongNow))return "哈哈哈，肚子都笑圆了。";
             if(model.Paused) return "先歇一下，我在这里。";
             if(companion.Mood==CompanionMood.Sleeping)return "搭子睡着了，回来时一起开工。";
             if(companion.Mood==CompanionMood.Yawning)return "打个哈欠，眯一小会儿。";
@@ -371,7 +374,7 @@ namespace OfficeBuddy {
             if(activeTab=="shop")DrawShopPage(g);else if(activeTab=="style")DrawStylePage(g);else if(activeTab=="settings")DrawSettingsPage(g);else if(activeTab=="month")DrawMonth(g);else DrawOverview(g);
             string footer=saveError!=""?"保存失败 · 右键菜单查看数据路径":!rawOk&&!renderOnly?"鼠标监听未启动 · 请重启":store.Notice!=""?store.Notice:"仅本地记录 · 隐藏搭子后继续统计";
             Ellipse(g,saveError!=""?Color.Firebrick:green,26,529,6,6);Txt(g,footer,39,522,12,muted,false);
-            Txt(g,"v0.9.0",649,522,12,muted,false);
+            Txt(g,"v0.10.2",649,522,12,muted,false);
         }
         void DrawOverview(Graphics g) {
             Day d=model.Today(DateTime.Now);Panel(g,24,88,672,160);
@@ -399,8 +402,8 @@ namespace OfficeBuddy {
         }
         void DrawStylePage(Graphics g) {
             Txt(g,"选一个今天的搭子",24,99,22,ink,true);Txt(g,"小小一只，字可以大一点。",25,135,14,muted,false);
-            string original=Skin;string[] themes={"pixel","cream","midnight"};string[] names={"薄荷像素","杏桃糯米兔","月光夜猫"};
-            for(int i=0;i<3;i++){float x=24+i*228;Panel(g,x,178,216,182);Fill(g,C("#F2F4ED"),x+12,190,192,113,12);model.Data.Theme=themes[i];PetArt(g,x+45,194,0.47f);model.Data.Theme=original;string choice=themes[i];Button(g,names[i]+(original==choice?" ✓":""),x+12,315,192,32,()=>ChooseTheme(choice),original==choice);}
+            string original=Skin;
+            for(int i=0;i<Themes.Length;i++){float x=24+i*172;Panel(g,x,178,156,182);Fill(g,C(i==3?"#FFF3D8":"#F2F4ED"),x+10,190,136,113,12);model.Data.Theme=Themes[i];PetArt(g,x+22,200,0.42f);model.Data.Theme=original;string choice=Themes[i];Button(g,ThemeNames[i]+(original==choice?" ✓":""),x+10,315,136,32,()=>ChooseTheme(choice),original==choice);}
             Panel(g,24,378,672,120);Txt(g,"角色大小",44,399,14,ink,true);int j=0;foreach(int value in new[]{40,55,70}){int v=value;Button(g,value==40?"迷你":value==55?"小号":"中号",163+j++*75,393,67,32,()=>ChoosePetSize(v),model.Data.PetScale==value);}
             Txt(g,"文字大小",44,446,14,ink,true);j=0;foreach(int value in new[]{100,120,140}){int v=value;Button(g,value+"%",163+j++*75,440,67,32,()=>ChooseZoom(v),model.Data.Zoom==value);}
             Txt(g,"文字与角色独立缩放",465,427,13,muted,false);
@@ -498,6 +501,7 @@ namespace OfficeBuddy {
             g.Restore(state);
         }
         void PixelCompanion(Graphics g,double phase) {
+            if(Skin=="nailong"){DrawNailong(g,phase);return;}
             Bitmap body=Skin=="pixel"?rigSprite:null;
             if(model.IsPlaced("cushion"))Decor(g,"cushion",56,122,2.2f);
             if(model.IsPlaced("lamp"))Decor(g,"lamp",263,181,0.75f);
@@ -543,7 +547,7 @@ namespace OfficeBuddy {
             if(mode=="water")Decor(g,"cup",119,142,0.62f);
         }
         protected override void Dispose(bool disposing) {
-            if(disposing){if(reminderWindow!=null)reminderWindow.Close();if(rabbitMotion!=null)rabbitMotion.Dispose();if(nightMotion!=null)nightMotion.Dispose();timer.Dispose();}
+            if(disposing){if(reminderWindow!=null)reminderWindow.Close();if(rabbitMotion!=null)rabbitMotion.Dispose();if(nightMotion!=null)nightMotion.Dispose();if(nailongAtlas!=null)nailongAtlas.Dispose();timer.Dispose();}
             base.Dispose(disposing);
         }
         void Decorations(Graphics g) {
@@ -583,7 +587,7 @@ namespace OfficeBuddy {
         }
         public bool CheckHoverRendering() {
             compact=true;ClientSize=new Size(320,360);previewPointerDriven=true;previewQuiet=false;
-            foreach(string theme in new[]{"pixel","cream","midnight"})foreach(int size in new[]{40,55,70})foreach(int zoom in new[]{100,120,140}) {
+            foreach(string theme in Themes)foreach(int size in new[]{40,55,70})foreach(int zoom in new[]{100,120,140}) {
                 model.Data.Theme=theme;model.Data.PetScale=size;model.Data.Zoom=zoom;panelHovered=false;through=false;
                 if(PreviewPanelVisible())return false;
                 if(!ApplyPointerHover(new PointF(160,295),true)||!PreviewPanelVisible())return false;
@@ -599,6 +603,7 @@ namespace OfficeBuddy {
         }
         public void Screenshot(string path,bool small,bool quiet=false,float density=1) { previewQuiet=quiet;compact=small;ClientSize=new Size((int)((small?320:720)*density),(int)((small?360:560)*density));using(Bitmap b=new Bitmap(ClientSize.Width,ClientSize.Height,System.Drawing.Imaging.PixelFormat.Format32bppPArgb)) {using(Graphics g=Graphics.FromImage(b)) OnPaint(new PaintEventArgs(g,new Rectangle(Point.Empty,ClientSize)));b.Save(path,System.Drawing.Imaging.ImageFormat.Png);} }
         public void MotionFrames(string folder) {
+            if(Skin=="nailong"){NailongPoses(folder);return;}
             Directory.CreateDirectory(folder);previewPhase=0.5;previewQuiet=true;previewBlink=false;mode="work";
             foreach(string pose in new[]{"neutral","look-left","look-right","look-up","look-down","blink","left-hand","right-hand","both-hands","rest"}) {
                 previewGaze=pose=="look-left"?new PointF(-3.5f,0):pose=="look-right"?new PointF(3.5f,0):pose=="look-up"?new PointF(0,-1.8f):pose=="look-down"?new PointF(0,1.8f):PointF.Empty;
@@ -667,7 +672,7 @@ namespace OfficeBuddy {
             report.Add("PASS: transparent pixels pass input to underlying window; opaque character accepts input");
             ToggleCompact();Close();if(!compact||IsDisposed)throw new Exception("closing dashboard failed to return to pet");
             report.Add("PASS: closing dashboard returns to desktop pet");
-            string old=Skin;foreach(string theme in new[]{"pixel","cream","midnight"}){ChooseTheme(theme);RenderLayer();if(!layerOk)throw new Exception("theme render failed: "+theme);}ChooseTheme(old);report.Add("PASS: all three themes render and switch at runtime");
+            string old=Skin;foreach(string theme in Themes){ChooseTheme(theme);RenderLayer();if(!layerOk)throw new Exception("theme render failed: "+theme);}ChooseTheme(old);report.Add("PASS: all four themes render and switch at runtime");
             foreach(string state in new[]{"work","water","rest"}){Mode(state);RenderLayer();if(!layerOk)throw new Exception("companion state render failed: "+state);}Mode("work");report.Add("PASS: work, water and rest states render at runtime");
             leftTap=rightTap=0;long before=Total;Receive(0);if(leftTap!=1||rightTap!=0||Total!=before+1)throw new Exception("left input animation routing failed");
             Receive(1);if(leftTap!=1||rightTap!=1||Total!=before+2)throw new Exception("alternating input lost a hand animation");
@@ -689,6 +694,9 @@ namespace OfficeBuddy {
             Native.EnableDpi();Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
             try {
                 if(args.Length>0 && args[0]=="--self-test") {Tests.Run(args[1]);return 0;}
+                if(args.Length>0 && args[0]=="--nailong-poses") {using(var f=new BuddyForm(new Model(new SaveData{Theme="nailong"}),new Store(""),true))f.NailongPoses(args[1]);return 0;}
+                if(args.Length>0 && args[0]=="--nailong-motion-frames") {BuddyForm.NailongMotionFrames(args[1]);return 0;}
+                if(args.Length>0 && args[0]=="--nailong-video-frames") {using(var f=new BuddyForm(new Model(new SaveData{Theme="nailong"}),new Store(""),true))f.NailongVideo(args[1]);return 0;}
                 if(args.Length>0 && args[0]=="--settings-preview") {using(var f=new BuddyForm(new Model(new SaveData()),new Store(""),true))f.SettingsPreview(args[1],args.Length>2?int.Parse(args[2]):0);return 0;}
                 if(args.Length>0 && args[0]=="--feature-poses") {using(var f=new BuddyForm(new Model(new SaveData{Theme=args.Length>2?args[2]:"pixel"}),new Store(""),true))f.FeaturePose(args[1]);return 0;}
                 if(args.Length>0 && args[0]=="--companion-showcase") {using(var f=new BuddyForm(new Model(new SaveData{Theme=args.Length>2?args[2]:"pixel"}),new Store(""),true))f.CompanionShowcase(args[1]);return 0;}
@@ -705,7 +713,7 @@ namespace OfficeBuddy {
                 }
                 if(args.Length>0 && args[0]=="--input-probe") {Probe(args[1],int.Parse(args[2]));return 0;}
                 bool created;using(Mutex mutex=new Mutex(true,"Local\\OfficeBuddy-Yapeng-v01",out created)) {
-                    if(!created){if(args.Length>1&&args[0]=="--theme"){bool sent=false;for(int i=0;i<10&&!sent;i++){sent=Native.DispatchTheme(args[1]=="cream"?1:args[1]=="midnight"?2:0);if(!sent)Thread.Sleep(100);}if(!sent){MessageBox.Show("请先从旧版搭子的右键菜单正常退出，再启动新版。","上班搭子");return 2;}}else MessageBox.Show("搭子已经在运行。请从右键菜单切换外观。","上班搭子");return 0;}
+                    if(!created){if(args.Length>1&&args[0]=="--theme"){bool sent=false;for(int i=0;i<10&&!sent;i++){sent=Native.DispatchTheme(Math.Max(0,Array.IndexOf(BuddyForm.Themes,args[1])));if(!sent)Thread.Sleep(100);}if(!sent){MessageBox.Show("请先从旧版搭子的右键菜单正常退出，再启动新版。","上班搭子");return 2;}}else MessageBox.Show("搭子已经在运行。请从右键菜单切换外观。","上班搭子");return 0;}
                     string path=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"OfficeBuddy","save.json");
                     Store s=new Store(path);SaveData data;
                     try {data=s.Load();}catch(Exception ex){MessageBox.Show("无法读取存档："+ex.Message,"上班搭子");return 1;}
@@ -749,6 +757,7 @@ namespace OfficeBuddy {
         }
         public static void Run(string output) {
             FeatureChecks.Run(Assert,Path.GetDirectoryName(output));
+            using(var f=new BuddyForm(new Model(new SaveData{Theme="nailong"}),new Store(""),true))f.CheckNailong(Assert,Path.GetDirectoryName(output));
             CheckFixedEyes();
             Assert(BuddyForm.ArtworkReady,"body layer and companion assets embedded with transparent corners");
             using(var f=new BuddyForm(new Model(new SaveData()),new Store(""),true))Assert(f.CheckHoverRendering(),"hover shows panel, bridge preserves access, leaving hides immediately, messages stay hidden; all themes and sizes");

@@ -16,7 +16,7 @@ function Invoke-BuddyCheck([string]$flag,[string]$output,[string]$theme = '') {
 Invoke-BuddyCheck '--self-test' (Join-Path $taskResults 'core.txt')
 if ($Overlay) {
     if (Get-Process -Name OfficeBuddyStudio -ErrorAction SilentlyContinue) { throw '请先从托盘正常退出搭子，再运行独立窗口检查。' }
-    foreach ($taskTheme in @('pixel','cream','midnight')) {
+    foreach ($taskTheme in @('pixel','cream','midnight','nailong')) {
         Invoke-BuddyCheck '--overlay-test' (Join-Path $taskResults ('overlay-' + $taskTheme + '.txt')) $taskTheme
     }
 }

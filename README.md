@@ -1,4 +1,4 @@
-# 上班搭子
+﻿# 上班搭子
 
 一只住在桌面角落的小搭子：你的鼠标每点一下，它就跟着忙一下。记录点击次数，慢慢攒币，把小工位布置得更可爱。
 
@@ -6,11 +6,21 @@ A tiny Windows desktop companion with global mouse click counting, animated pixe
 
 ![三款像素角色与装饰](v090-catalog.png)
 
+## 抽象奶龙
+
+抽象奶龙以用户截图重绘：绿色圆眼、奶油色肚皮、头身连成一体和粗短四肢，不带电脑；支持抱臂、托腮和露齿捧腹大笑。快速连续点击 5 次会触发约 3.6 秒的捧腹大笑，头部与肚子连续起伏，脚底固定，动作缓入缓出；自动触发间隔至少 8 秒，右键可手动大笑。左键与左侧键抬左手，右键与右侧键抬右手；两侧独立且对称，中键同时抬手，重复点击从当前手部位置继续。喝水和午休优先，暂停不触发点击动作。原有三款像素角色保留。
+
+![抽象奶龙大笑](抽象奶龙大笑.gif)
+
+![奶龙左右键响应](奶龙左右手.gif)
+
+双击 `抽象奶龙.cmd` 或在外观/设置中选择「抽象奶龙」。素材出处与演示生成方法见 [NAILONG-NOTES.md](NAILONG-NOTES.md)。
+
 ## 运行
 
 适用于 64 位 Windows 10 / 11，使用系统 .NET Framework 4.x。
 
-在仓库 Releases 下载 `OfficeBuddyStudio-v0.9.0-windows-x64.zip`，解压后运行；GitHub 的 Source code 包需要先构建。
+获取 `OfficeBuddyStudio-v0.10.2-windows-x64.zip`，解压后运行；GitHub 的 Source code 包需要先构建。
 
 双击 `OfficeBuddyStudio.exe`，默认显示小号透明桌宠。将鼠标移到搭子上，展开今日计数与暂停、喝水、午休、工位操作；移到浮层上可继续操作，移开立即隐藏，不延时停留。拖动搭子移动位置，右键或托盘菜单可调整大小、切换外观、隐藏或退出。
 
@@ -102,4 +112,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\package.ps1
 
 导出到 `work/packages`：一个可直接初始化 Git 的源码目录、源码 ZIP 和 Windows 运行 ZIP。清单包含当前文档和素材，排除 EXE（源码包）、旧预览、临时数据与个人存档。相同版本的 ZIP 已存在时会停止，可指定新的 `-OutputDirectory`。GitHub Actions 会构建、执行功能检查并导出 ZIP；桌面窗口与图像检查在本地 Windows 会话运行。
 
-项目采用 [MIT 许可证](LICENSE)，素材来源见 [ASSETS.md](ASSETS.md)，版本记录见 [CHANGELOG.md](CHANGELOG.md)。
+代码采用 [MIT 许可证](LICENSE)，抽象奶龙的第三方角色说明见 [NAILONG-NOTES.md](NAILONG-NOTES.md)，其他素材来源见 [ASSETS.md](ASSETS.md)，版本记录见 [CHANGELOG.md](CHANGELOG.md)。
